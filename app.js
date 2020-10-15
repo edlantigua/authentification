@@ -4,7 +4,7 @@ const express = require('express'),
        ejs    = require('ejs'),
   bodyParser  =  require('body-parser'),
   mongoose    = require('mongoose'),
-  encrypt     = require('mongoose-encryption'),
+  md5         = require('md5'),
     app = express();
 
 app.use(express.static('public'));
@@ -28,7 +28,6 @@ const userSchema = new mongoose.Schema ({
 
 // we can also call for the method decryptPostSave: false  to leave document encrypt in the database
 // tenemos que crear otro file para que puede tener nuestra informacion secret y no tener que tenerla en github.
-userSchema.plugin(encrypt, {secret: process.env.SECRET, encryptedFields:['password'], additionalAuthenticatedFields: ['email']});
 
 const User = new mongoose.model("User", userSchema);
 
@@ -42,7 +41,7 @@ app.get("/login", function(req,res){
 
 
 app.post("/login", function(req,res){
-        const password = req.body.password;
+        const password = md5(req.body.password);
 
 //  encrypt will decrept the password here       
    User.findOne({email:req.body.username}, function(err , foundUser){
@@ -72,7 +71,7 @@ app.post('/register', function(req, res){
 //  encrypt will encrypt the passowrd here
   const newUser = new User ({
        email: req.body.username,
-       password: req.body.password
+       password: md5(req.body.password)
   });
 
   newUser.save(function(err){
