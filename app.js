@@ -4,8 +4,12 @@ const express = require('express'),
        ejs    = require('ejs'),
   bodyParser  =  require('body-parser'),
   mongoose    = require('mongoose'),
-  md5         = require('md5'),
+   bcrypt     = require('bcrypt'),
     app = express();
+
+// here we specify the numbers of salts we'll implement
+
+const saltRounds = 10;
 
 app.use(express.static('public'));
 app.set("view engine", "ejs");
@@ -41,21 +45,25 @@ app.get("/login", function(req,res){
 
 
 app.post("/login", function(req,res){
-        const password = md5(req.body.password);
+        const password = req.body.password;
 
 //  encrypt will decrept the password here       
    User.findOne({email:req.body.username}, function(err , foundUser){
-      if(!err){
+      if(err){
+         console.log("we had a problem " + err)
+         return  res.redirect("/login");
+      }  else{
          if(foundUser){
-         if(foundUser.password === password){
            console.log("WO00HAA there is no problem")
-           console.log(password);
-        return  res.render("secrets");
+         //   esto es lo que compara la hashed password que tenemos en la database con
+         //   las que el user esta poniendo cuando trata de entrar a la pagina
+           bcrypt.compare(password, foundUser.password, function(err, result) {
+             if(result === true){
+              res.render("secrets");
+             }
+
          }
-      }
-         console.log("we had a problem " + err);
-         console.log(password);
-       return  res.redirect("/login");
+           )}
       }
       
    })
@@ -67,20 +75,32 @@ app.get("/register", function(req,res){
 });
 
 app.post('/register', function(req, res){
-   // esta es la forma como yo queria dejarlo pero para encrupt tengo que cambiarlo
+//  Esta es la manera como creamos hashed password and we also 
+//  salt it to make it harder to crack
 //  encrypt will encrypt the passowrd here
-  const newUser = new User ({
-       email: req.body.username,
-       password: md5(req.body.password)
-  });
+  const password = req.body.password;
+// this is the code needed to bcrypt an user when creating it
+  bcrypt.hash(password, saltRounds, function(err, hash) {
+   const newUser = new User ({
+      email: req.body.username,
+      password: hash
+ }); 
+   
+ newUser.save(function(err){
+    if(err){
+       console.log(err);
+   if(err.code === 11000){
+   return res.send("this email is already taken");
+   }
+} 
+   else {
+      res.render('secrets');
+   }
+})
 
-  newUser.save(function(err){
-     if(err){
-        console.log(err);
-     } else {
-        res.render('secrets');
-     }
-  })
+});
+
+
 //   this will also work 
    //  User.create({email: req.body.username, password: req.body.password}, function(err, user){
    //        if(!err){
