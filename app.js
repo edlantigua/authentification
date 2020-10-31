@@ -10,7 +10,7 @@ const express = require('express'),
 passportLocalMongoose = require('passport-local-mongoose'),
 GoogleStrategy = require('passport-google-oauth20').Strategy,
  findOrCreate = require("mongoose-findorcreate"),
- FacebookStrategy = require('passport-facebook').Strategy;  
+ FacebookStrategy = require('passport-facebook').Strategy,  
     app = express();
 
 
@@ -35,7 +35,8 @@ const userSchema = new mongoose.Schema ({
    email : String,
    password: String,
    googleId: String,
-   facebookId: String
+   facebookId: String,
+   secret: String
 });
 
 userSchema.plugin(passportLocalMongoose);
@@ -65,7 +66,7 @@ passport.use(new GoogleStrategy({
    userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo"
  },
  function(accessToken, refreshToken, profile, cb) {
-    console.log(profile + "From google");
+    console.log(profile + accessToken + refreshToken);
    User.findOrCreate({ googleId: profile.id }, function (err, user) {
      return cb(err, user);
    });
@@ -78,7 +79,7 @@ passport.use(new FacebookStrategy({
    callbackURL: "http://localhost:3000/auth/facebook/secrets"
  },
  function(accessToken, refreshToken, profile, cb) {
-    console.log(profile + "FROM FACEBOOK");
+    console.log(profile + accessToken + refreshToken);
    User.findOrCreate({ facebookId: profile.id }, function (err, user) {
      return cb(err, user);
    });
@@ -155,15 +156,26 @@ app.get("/register", function(req,res){
 });
 
 app.get("/secrets", function(req, res){
-   if(req.isAuthenticated()){
-      res.render('secrets');
-   } else {
-      res.redirect("/login");
-   }
+   // if(req.isAuthenticated()){
+   //    res.render('secrets');
+   // } else {
+   //    res.redirect("/login");
+   // }
+
+   // look for all  users how's secrets is not empty
+   User.find({"secret": {$ne: null}}, function(err, foundUser){
+      if(err){
+         console.log(err);
+      } else {
+          if(foundUser){
+         res.render('secrets', {usersWithSecret : foundUser});
+          }
+      }
+   })
 })
 
 app.post('/register', function(req, res){
-
+// user registration
   User.register({username: req.body.username}, req.body.password, function(err, user){
      console.log(req.body.username);
      console.log(req.body.password);
@@ -194,9 +206,34 @@ app.post('/register', function(req, res){
    //  })
 
 app.get("/submit", function(req,res){
-   res.render('submit');
+   if(req.isAuthenticated()){
+      res.render('submit');
+   } else {
+      res.redirect("/login");
+   }
 });
 
+app.post("/submit", function(req,res){
+ const submittedSecret = req.body.secret;
+// passport save the users information so we can console.log it
+
+ console.log(req.user.id);
+
+ User.findById(req.user.id, function(err, user){
+   if(err){
+      console.log(err);
+   } else {
+      if (user){
+         user.secret = submittedSecret;
+         user.save(function(){
+            res.redirect('/secrets');
+         });
+      }
+   }
+         
+ })
+
+});
 
 app.listen(3000, function(){
    console.log('Crib set on 3000');
